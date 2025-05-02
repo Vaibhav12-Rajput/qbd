@@ -185,7 +185,7 @@ exports.createBillController = async (req, res) => {
   let responseMessage;
 
   try {
-    let bill = req.body.bill;
+    let bill = req.body;
     const validationErrors = validateBillPayload(bill);
     if (validationErrors.length > 0) {
       return res.status(400).send(new CommonResponsePayload("Validation Failed", { errors: validationErrors }));
