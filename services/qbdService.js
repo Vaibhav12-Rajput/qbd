@@ -962,7 +962,7 @@ const processBill = async (bill, ticket, companyName) => {
 
 const checkIfBillAlreayPaid = async (txnId, ticket) =>{
   const billResponse = await getBillByTxnId(txnId, ticket);
-  if (billResponse.IsPaid === true) {
+  if (String(billResponse.IsPaid).toLowerCase() === "true") {    
     logger.error("Bill already paid");
     throw new Error("Bill already paid cannot update It");
   }
