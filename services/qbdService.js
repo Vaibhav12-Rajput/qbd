@@ -1093,7 +1093,7 @@ const prepareExpenseLines = async (lines, ticket, companyName) => {
           FullName: line.taxLine.expenseAccount,
         },
         Amount: taxAmount,
-        Memo: `${line.taxLine.description} Rate ${line.taxRate}`,
+        Memo: `${line.taxLine.description} (Rate ${line.taxRate})`,
       });
     }
   }
