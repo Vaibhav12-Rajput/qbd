@@ -189,7 +189,7 @@ exports.createBillController = async (req, res) => {
 
     const validationErrors = validateBillPayload(bill);
     if (validationErrors.length > 0) {
-      return res.status(400).send(new CommonResponsePayload("Validation Failed", { errors: validationErrors }));
+      return res.status(400).send(new CommonResponsePayload(validationErrors, {}));
     }
     const companyPath = readConfigFile.getCompanyPath(companyName);
 
@@ -241,42 +241,42 @@ exports.createBillController = async (req, res) => {
 
 const validateBillPayload = (payload) => {
   const errors = [];
-
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const mobileRegex = /^\+\d{10,15}$/;
-
-  if (!payload.poId || payload.poId.trim() === "") {
-    errors.push("'poId' is required and cannot be null, undefined, or blank");
+  const tenDigitMobileRegex = /^\+\d{10,12}$/;
+  // Validate 'to' object
+  if (!payload.to) {
+    errors.push("'to' is required");
+  } else {
+    const toEmail = payload.to.contactPersonEmail;
+    const toMobile = payload.to.contactPersonMobile;
+    if (toEmail && !emailRegex.test(toEmail)) {
+      errors.push("Invalid 'to.contactPersonEmail'");
+    }
+    if (!toMobile) {
+      errors.push("'to.contactPersonMobile' is required");
+    } else if (!tenDigitMobileRegex.test(toMobile)) {
+      errors.push("Invalid 'to.contactPersonMobile'. It should be a 10-digit number without symbols or country code.");
+    }
   }
-
-  // Validate 'to' email
-  if (payload.to?.contactPersonEmail && !emailRegex.test(payload.to.contactPersonEmail)) {
-    errors.push("Invalid 'to.contactPersonEmail'");
+  // Validate 'from' object
+  if (!payload.from) {
+    errors.push("'from' is required");
+  } else {
+    const fromEmail = payload.from.contactPersonEmail;
+    const fromMobile = payload.from.contactPersonMobile;
+    if (fromEmail && !emailRegex.test(fromEmail)) {
+      errors.push("Invalid 'from.contactPersonEmail'");
+    }
+    if (fromMobile && !tenDigitMobileRegex.test(fromMobile)) {
+      errors.push("Invalid 'from.contactPersonMobile'. It should be a 10-digit number");
+    }
   }
-
-  // Validate 'from' email
-  if (payload.from?.contactPersonEmail && !emailRegex.test(payload.from.contactPersonEmail)) {
-    errors.push("Invalid 'from.contactPersonEmail'");
-  }
-
-  // Validate mobile number
-  const mobile = payload.to?.contactPersonMobile;
-  if (!mobile) {
-    errors.push("'to.contactPersonMobile' is required");
-  } else if (mobile.includes("-")) {
-    errors.push("'to.contactPersonMobile' should not contain negative numbers");
-  } else if (!mobileRegex.test(mobile)) {
-    errors.push("Invalid 'to.contactPersonMobile'. Format should be like +919876543210");
-  }
-
   // Validate line items
   if (!Array.isArray(payload.lines) || payload.lines.length === 0) {
     errors.push("At least one line item is required");
   } else {
     payload.lines.forEach((line, index) => {
       const lineIndex = index + 1;
-
-      logger.info("Amount Amount validations: " + line.amount);
       // Amount validations
       if (line.amount == null || line.amount === "") {
         errors.push(`Line ${lineIndex}: 'amount' is required`);
@@ -285,13 +285,11 @@ const validateBillPayload = (payload) => {
       } else if (isNaN(line.amount)) {
         errors.push(`Line ${lineIndex}: 'amount' must be a valid number`);
       } else if (Number(line.amount) < 0) {
-        errors.push(`Line ${lineIndex}: Negative amount not possible`);
+        errors.push(`Line ${lineIndex}: Negative amount not allowed`);
       } else if (Number(line.amount) === 0) {
         errors.push(`Line ${lineIndex}: 'amount' must be greater than zero`);
       }
-
-      logger.info("Amount Tax line validation: " + line.taxLine.amount);
-      // Tax line validation (if provided)
+      // Tax line validations
       if (line.taxLine) {
         const taxAmount = line.taxLine.amount;
         if (taxAmount == null || taxAmount === "") {
@@ -301,13 +299,12 @@ const validateBillPayload = (payload) => {
         } else if (isNaN(taxAmount)) {
           errors.push(`Line ${lineIndex}: 'taxLine.amount' must be a valid number`);
         } else if (Number(taxAmount) < 0) {
-          errors.push(`Line ${lineIndex}: Negative amount not possible`);
+          errors.push(`Line ${lineIndex}: Negative tax amount not allowed`);
         } else if (Number(taxAmount) === 0) {
-          errors.push(`Line ${lineIndex}: 'amount' must be greater than zero`);
+          errors.push(`Line ${lineIndex}: 'taxLine.amount' must be greater than zero`);
         }
       }
     });
   }
-
   return errors;
 };
