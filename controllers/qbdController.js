@@ -257,6 +257,10 @@ const validateBillPayload = (payload) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const mobileRegex = /^\+\d{10,15}$/;
 
+  if (!payload.poId || payload.poId.trim() === "") {
+    errors.push("'poId' is required and cannot be null, undefined, or blank");
+  }
+
   // Validate 'to' email
   if (payload.to?.contactPersonEmail && !emailRegex.test(payload.to.contactPersonEmail)) {
     errors.push("Invalid 'to.contactPersonEmail'");
