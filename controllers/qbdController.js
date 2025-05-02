@@ -189,7 +189,7 @@ exports.createBillController = async (req, res) => {
 
     const validationErrors = validateBillPayload(bill);
     if (validationErrors.length > 0) {
-      return res.status(400).send(new CommonResponsePayload(validationErrors, {}));
+      return res.status(400).send(new CommonResponsePayload(validationErrors[0], {}));
     }
     const companyPath = readConfigFile.getCompanyPath(companyName);
 
