@@ -183,14 +183,14 @@ exports.createBillController = async (req, res) => {
   let ticket;
   let responsePayload;
   let responseMessage;
-
+  let bill = req.body;
+  const companyName = req.body.qbCompanyConfigCode;
   try {
-    let bill = req.body;
+
     const validationErrors = validateBillPayload(bill);
     if (validationErrors.length > 0) {
       return res.status(400).send(new CommonResponsePayload("Validation Failed", { errors: validationErrors }));
     }
-    const companyName = req.body.qbCompanyConfigCode;
     const companyPath = readConfigFile.getCompanyPath(companyName);
 
     if (!companyPath) {
@@ -206,20 +206,8 @@ exports.createBillController = async (req, res) => {
     logger.info(`Session began for ${companyName}`);
 
     let billResponse = null;
-    // for (const bill of allBill) {
+    billResponse = await processBill(bill, ticket, companyName);
 
-      try {
-        billResponse = await processBill(bill, ticket, companyName);
-      } catch (error) {
-        logger.error(error)
-        let response = await insertOrUpdateBillInDBForFailure(invoicePayload.poId, error.message, invoicePayload.billDate, companyName)
-        reponseList.push({
-          ...response,
-          message: error.message
-        });
-      }
-
-    // }
 
     logger.info("Deleting older DB records")
     await removeOldDBRecords();
@@ -233,7 +221,7 @@ exports.createBillController = async (req, res) => {
     responsePayload = new CommonResponsePayload("Bill Created", { billResponse: billResponse });
     return res.status(201).send(responsePayload);
   } catch (err) {
-
+    await insertOrUpdateBillInDBForFailure(bill.poId, err.message, bill.billDate, companyName)
     if (ticket) {
       try {
         QBApp.EndSession(ticket);
@@ -288,7 +276,7 @@ const validateBillPayload = (payload) => {
     payload.lines.forEach((line, index) => {
       const lineIndex = index + 1;
 
-      logger.info("Amount Amount validations: " +line.amount);
+      logger.info("Amount Amount validations: " + line.amount);
       // Amount validations
       if (line.amount == null || line.amount === "") {
         errors.push(`Line ${lineIndex}: 'amount' is required`);
@@ -302,7 +290,7 @@ const validateBillPayload = (payload) => {
         errors.push(`Line ${lineIndex}: 'amount' must be greater than zero`);
       }
 
-      logger.info("Amount Tax line validation: " +line.taxLine.amount);
+      logger.info("Amount Tax line validation: " + line.taxLine.amount);
       // Tax line validation (if provided)
       if (line.taxLine) {
         const taxAmount = line.taxLine.amount;

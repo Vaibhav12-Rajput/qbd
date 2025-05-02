@@ -925,17 +925,21 @@ const createInvoice = async (invoice, ticket, companyName) => {
 const processBill = async (bill, ticket, companyName) => {
   let billTxnIdToDelete;
   let oldBillRecord = await db.findOneAsync({ poId: bill.poId, qbCompanyConfigCode: companyName });
-  let existingQbBillNumber = oldBillRecord ? oldBillRecord.qbBillNumber  : bill.qbBillNumber ;
+  let existingQbBillNumber = oldBillRecord ? oldBillRecord.qbBillNumber : bill.qbBillNumber;
   if (existingQbBillNumber) {
     logger.info("Bill creating again.")
     if (oldBillRecord && oldBillRecord.billTxnId) {
       billTxnIdToDelete = oldBillRecord.billTxnId;
       logger.info(`Picked invTxnIdToDelete from db : ${billTxnIdToDelete} for poId : ${bill.poId} and qbBillNumber : ${existingQbBillNumber}`)
     }
-    else {      
+    else {
       logger.info(`Bill txnId not found in db for poId : ${bill.poId} and qbBillNumber : ${existingQbBillNumber}`)
       throw new Error("Bill txnId not found in db for poId : ${bill.poId} and qbBillNumber : ${existingQbBillNumber}");
     }
+  }
+
+  if(billTxnIdToDelete){
+    await checkIfBillAlreayPaid(billTxnIdToDelete, ticket);
   }
   // let { invoiceRefNumber, invoiceTxnId } = await createInvoice(invoice, ticket, companyName);
   let response = await createBill(bill, ticket, companyName);
@@ -956,25 +960,58 @@ const processBill = async (bill, ticket, companyName) => {
   return response;
 }
 
+const checkIfBillAlreayPaid = async (txnId, ticket) =>{
+  const billResponse = await getBillByTxnId(txnId, ticket);
+  if (billResponse.IsPaid === true) {
+    logger.error("Bill already paid");
+    throw new Error("Bill already paid cannot update It");
+  }
+}
+
+const getBillByTxnId = async (txnId, ticket) => {
+  try {
+    logger.info(`Fetching bill with TxnID: ${txnId}`);
+
+    const billQuery = xmlPayloads.getBillByTxnIdQuery.replace("BILL_TXN_ID", txnId);
+    const billResponse = await sendRequestToQBD(billQuery, ticket);
+    const billResponseJson = convertXmlToJson(billResponse);
+
+    const billRs = billResponseJson?.QBXML?.QBXMLMsgsRs?.BillQueryRs;
+    const statusCode = billRs?.$?.statusCode;
+
+    if (statusCode == STATUS_CODES.ZERO && billRs.BillRet) {
+      logger.info(`Bill with TxnID: ${txnId} fetched successfully`);
+      return billRs.BillRet;
+    } else {
+      logger.info(`No bill found with TxnID: ${txnId}`);
+      return null;
+    }
+  } catch (error) {
+    logger.error("Error fetching bill by TxnID:", error);
+    throw new Error(`Failed to fetch bill. ${error.message}`);
+  }
+}
+
+
 const deleteOldBill = async (billTxnIdToDelete, ticket) => {
   try {
-      logger.info(`Attempting to delete bill with txnId: ${billTxnIdToDelete}`);
-      const billDeleteQuery = xmlPayloads.deleteTransactionQuery
-          .replace("TRANSACTION_TYPE", "Bill")
-          .replace("TRANSACTION_ID", billTxnIdToDelete);
-      const deleteResponse = await sendRequestToQBD(billDeleteQuery, ticket);
-      const deleteResponseInJson = convertXmlToJson(deleteResponse);
-      const statusCode = deleteResponseInJson.QBXML.QBXMLMsgsRs.TxnDelRs.$.statusCode;
-      if (statusCode == STATUS_CODES.ZERO) {
-          logger.info(`Bill with txnId: ${billTxnIdToDelete} deleted successfully`);
-          return "UPDATED";
-      } else {
-          logger.info(`Bill with txnId: ${billTxnIdToDelete} could not be deleted`);
-          return "NOT DELETED";
-      }
+    logger.info(`Attempting to delete bill with txnId: ${billTxnIdToDelete}`);
+    const billDeleteQuery = xmlPayloads.deleteTransactionQuery
+      .replace("TRANSACTION_TYPE", "Bill")
+      .replace("TRANSACTION_ID", billTxnIdToDelete);
+    const deleteResponse = await sendRequestToQBD(billDeleteQuery, ticket);
+    const deleteResponseInJson = convertXmlToJson(deleteResponse);
+    const statusCode = deleteResponseInJson.QBXML.QBXMLMsgsRs.TxnDelRs.$.statusCode;
+    if (statusCode == STATUS_CODES.ZERO) {
+      logger.info(`Bill with txnId: ${billTxnIdToDelete} deleted successfully`);
+      return "UPDATED";
+    } else {
+      logger.info(`Bill with txnId: ${billTxnIdToDelete} could not be deleted`);
+      return "NOT DELETED";
+    }
   } catch (error) {
-      logger.error("Error deleting bill:", error);
-      throw new Error(`Failed to delete bill. ${error.message}`);
+    logger.error("Error deleting bill:", error);
+    throw new Error(`Failed to delete bill. ${error.message}`);
   }
 }
 
@@ -997,12 +1034,12 @@ const createBill = async (bill, ticket, companyName) => {
   logger.info(`Bill created successfully with qbBillNumber  : ${resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.RefNumber}`)
   const response = {
     billRefNumber: resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.RefNumber,
-    qbBillNumber : resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.TxnID,
+    qbBillNumber: resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.TxnID,
     billTxnId: resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.TxnID,
-    PoId : resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.RefNumber,
-    AmountDue : resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.AmountDue,
+    PoId: resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.RefNumber,
+    AmountDue: resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.AmountDue,
     IsPaid: resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.IsPaid,
-    TxnDate : resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.TxnDate
+    TxnDate: resultInJson.QBXML.QBXMLMsgsRs.BillAddRs.BillRet.TxnDate
   }
 
   return response;
@@ -1228,4 +1265,4 @@ const insertOrUpdateBillInDBForFailure = async (poId, errorMessage, billDate, qb
   return oldbillRecord;
 }
 
-module.exports = {insertOrUpdateBillInDBForFailure, sendRequestToQBD, checkTemplate, prepareTaxListForValidation, validateOrCreateCustomer, getItemAndProcessInvoice, validateSalesTax, checkOrCreateNonTax, checkOrCreateItems, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill };
+module.exports = { insertOrUpdateBillInDBForFailure, sendRequestToQBD, checkTemplate, prepareTaxListForValidation, validateOrCreateCustomer, getItemAndProcessInvoice, validateSalesTax, checkOrCreateNonTax, checkOrCreateItems, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill };
