@@ -1,7 +1,7 @@
 const readConfigFile = require("../util/configUtil");
 const { logger } = require("../config/winstonConfig");
 const { QBApp, appName } = require("../config/qbdConfig");
-const { checkTemplate, validateSalesTax, validateOrCreateCustomer, getItemAndProcessInvoice, checkOrCreateNonTax, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill } = require("../services/qbdService");
+const { checkTemplate, validateSalesTax, validateOrCreateCustomer, getItemAndProcessInvoice, checkOrCreateNonTax, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill, insertOrUpdateBillInDBForFailure } = require("../services/qbdService");
 const CommonResponsePayload = require("../responsePayload/commonResponsePayload");
 
 exports.connect = async (req, res) => {
@@ -185,6 +185,11 @@ exports.createBillController = async (req, res) => {
   let responseMessage;
 
   try {
+    let bill = req.body.bill;
+    const validationErrors = validateBillPayload(bill);
+    if (validationErrors.length > 0) {
+      return res.status(400).send(new CommonResponsePayload("Validation Failed", { errors: validationErrors }));
+    }
     const companyName = req.body.qbCompanyConfigCode;
     const companyPath = readConfigFile.getCompanyPath(companyName);
 
@@ -200,22 +205,14 @@ exports.createBillController = async (req, res) => {
     ticket = QBApp.BeginSession(companyPath, userMode);
     logger.info(`Session began for ${companyName}`);
 
-    let bill = req.body;
-
-    let reponseList = [];
+    let billResponse = null;
     // for (const bill of allBill) {
 
       try {
-        let billResponse = await processBill(bill, ticket, companyName);
-        // responseMessage = "Bill created Successfully.";
-        // // reponseList.push({
-        // //   ...billResponse,
-        // //   message: responseMessage,
-        // // });
-        // return res.status(201).send(billResponse);
+        billResponse = await processBill(bill, ticket, companyName);
       } catch (error) {
         logger.error(error)
-        let response = await insertOrUpdateInDBForFailure(invoicePayload.poId, error.message, invoicePayload.billDate, companyName)
+        let response = await insertOrUpdateBillInDBForFailure(invoicePayload.poId, error.message, invoicePayload.billDate, companyName)
         reponseList.push({
           ...response,
           message: error.message
@@ -233,7 +230,7 @@ exports.createBillController = async (req, res) => {
 
     logger.info(`Session ended for ${companyName}`);
 
-    responsePayload = new CommonResponsePayload("Invoice created", { invoicesResponse: reponseList });
+    responsePayload = new CommonResponsePayload("Bill Created", { billResponse: billResponse });
     return res.status(201).send(responsePayload);
   } catch (err) {
 
@@ -253,3 +250,72 @@ exports.createBillController = async (req, res) => {
     return res.status(400).send(responsePayload);
   }
 }
+
+const validateBillPayload = (payload) => {
+  const errors = [];
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const mobileRegex = /^\+\d{10,15}$/;
+
+  // Validate 'to' email
+  if (payload.to?.contactPersonEmail && !emailRegex.test(payload.to.contactPersonEmail)) {
+    errors.push("Invalid 'to.contactPersonEmail'");
+  }
+
+  // Validate 'from' email
+  if (payload.from?.contactPersonEmail && !emailRegex.test(payload.from.contactPersonEmail)) {
+    errors.push("Invalid 'from.contactPersonEmail'");
+  }
+
+  // Validate mobile number
+  const mobile = payload.to?.contactPersonMobile;
+  if (!mobile) {
+    errors.push("'to.contactPersonMobile' is required");
+  } else if (mobile.includes("-")) {
+    errors.push("'to.contactPersonMobile' should not contain negative numbers");
+  } else if (!mobileRegex.test(mobile)) {
+    errors.push("Invalid 'to.contactPersonMobile'. Format should be like +919876543210");
+  }
+
+  // Validate line items
+  if (!Array.isArray(payload.lines) || payload.lines.length === 0) {
+    errors.push("At least one line item is required");
+  } else {
+    payload.lines.forEach((line, index) => {
+      const lineIndex = index + 1;
+
+      logger.info("Amount Amount validations: " +line.amount);
+      // Amount validations
+      if (line.amount == null || line.amount === "") {
+        errors.push(`Line ${lineIndex}: 'amount' is required`);
+      } else if (typeof line.amount === 'string' && /[a-zA-Z]/.test(line.amount)) {
+        errors.push(`Line ${lineIndex}: 'amount' should not contain alphabets`);
+      } else if (isNaN(line.amount)) {
+        errors.push(`Line ${lineIndex}: 'amount' must be a valid number`);
+      } else if (Number(line.amount) < 0) {
+        errors.push(`Line ${lineIndex}: Negative amount not possible`);
+      } else if (Number(line.amount) === 0) {
+        errors.push(`Line ${lineIndex}: 'amount' must be greater than zero`);
+      }
+
+      logger.info("Amount Tax line validation: " +line.taxLine.amount);
+      // Tax line validation (if provided)
+      if (line.taxLine) {
+        const taxAmount = line.taxLine.amount;
+        if (taxAmount == null || taxAmount === "") {
+          errors.push(`Line ${lineIndex}: 'taxLine.amount' is required`);
+        } else if (typeof taxAmount === 'string' && /[a-zA-Z]/.test(taxAmount)) {
+          errors.push(`Line ${lineIndex}: 'taxLine.amount' should not contain alphabets`);
+        } else if (isNaN(taxAmount)) {
+          errors.push(`Line ${lineIndex}: 'taxLine.amount' must be a valid number`);
+        } else if (Number(taxAmount) < 0) {
+          errors.push(`Line ${lineIndex}: Negative amount not possible`);
+        } else if (Number(taxAmount) === 0) {
+          errors.push(`Line ${lineIndex}: 'amount' must be greater than zero`);
+        }
+      }
+    });
+  }
+
+  return errors;
+};
