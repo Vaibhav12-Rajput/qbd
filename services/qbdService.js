@@ -1004,7 +1004,7 @@ const deleteOldBill = async (billTxnIdToDelete, ticket) => {
     const statusCode = deleteResponseInJson.QBXML.QBXMLMsgsRs.TxnDelRs.$.statusCode;
     if (statusCode == STATUS_CODES.ZERO) {
       logger.info(`Bill with txnId: ${billTxnIdToDelete} deleted successfully`);
-      return "UPDATED";
+      return "DELETE";
     } else {
       logger.info(`Bill with txnId: ${billTxnIdToDelete} could not be deleted`);
       return "NOT DELETED";
@@ -1093,7 +1093,7 @@ const prepareExpenseLines = async (lines, ticket, companyName) => {
           FullName: line.taxLine.expenseAccount,
         },
         Amount: taxAmount,
-        Memo: line.taxLine.description,
+        Memo: `${line.taxLine.description} Rate ${line.taxRate}`,
       });
     }
   }
