@@ -933,7 +933,8 @@ const processBill = async (bill, ticket, companyName) => {
       logger.info(`Picked invTxnIdToDelete from db : ${billTxnIdToDelete} for poId : ${bill.poId} and qbBillNumber : ${existingQbBillNumber}`)
     }
     else {      
-      billTxnIdToDelete = existingQbBillNumber;
+      logger.info(`Bill txnId not found in db for poId : ${bill.poId} and qbBillNumber : ${existingQbBillNumber}`)
+      throw new Error("Bill txnId not found in db for poId : ${bill.poId} and qbBillNumber : ${existingQbBillNumber}");
     }
   }
   // let { invoiceRefNumber, invoiceTxnId } = await createInvoice(invoice, ticket, companyName);
@@ -984,9 +985,6 @@ const createBill = async (bill, ticket, companyName) => {
   const expenseLines = await prepareExpenseLines(bill.lines, ticket, companyName);
   logger.info("Successfully found the expence line");
 
-  if(bill.poId == null ){
-    bill.poId = bill.qbBillNumber;
-  } 
   const preparedBill = prepareBill(expenseLines, bill);
   const billInXML = jsonToXml(preparedBill);
   const result = await sendRequestToQBD(billInXML, ticket);
