@@ -924,13 +924,12 @@ const createInvoice = async (invoice, ticket, companyName) => {
 
 const processBill = async (bill, ticket, companyName) => {
   let billTxnIdToDelete;
-  let oldBillFound;
   let oldBillRecord = await db.findOneAsync({ poId: bill.poId, qbCompanyConfigCode: companyName });
   let existingQbBillNumber = oldBillRecord ? oldBillRecord.qbBillNumber  : bill.qbBillNumber ;
   if (existingQbBillNumber) {
     logger.info("Bill creating again.")
     if (oldBillRecord && oldBillRecord.billTxnId) {
-      billTxnIdToDelete = oldBillRecord.BillTxnId;
+      billTxnIdToDelete = oldBillRecord.billTxnId;
       logger.info(`Picked invTxnIdToDelete from db : ${billTxnIdToDelete} for poId : ${bill.poId} and qbBillNumber : ${existingQbBillNumber}`)
     }
     else {      
@@ -943,8 +942,8 @@ const processBill = async (bill, ticket, companyName) => {
   if (billTxnIdToDelete) {
     status = await deleteOldBill(billTxnIdToDelete, ticket);
   }
-  else if (existingQbBillNumber && !billTxnIdToDelete) {
-    status = oldBillFound == false ? "OLD Bill NOT FOUND" : "DUPLICATE OLD Bill FOUND"
+  if (existingQbBillNumber && billTxnIdToDelete) {
+    status = "BILL UPDATED"
   } else {
     status = "CREATED"
   }
@@ -967,7 +966,7 @@ const deleteOldBill = async (billTxnIdToDelete, ticket) => {
       const statusCode = deleteResponseInJson.QBXML.QBXMLMsgsRs.TxnDelRs.$.statusCode;
       if (statusCode == STATUS_CODES.ZERO) {
           logger.info(`Bill with txnId: ${billTxnIdToDelete} deleted successfully`);
-          return "DELETED";
+          return "UPDATED";
       } else {
           logger.info(`Bill with txnId: ${billTxnIdToDelete} could not be deleted`);
           return "NOT DELETED";
