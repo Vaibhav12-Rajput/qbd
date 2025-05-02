@@ -1,0 +1,30 @@
+{
+  "name": "QuickBooks Desktop Integration App",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node app",
+    "build": "pkg app.js -o QBConnect_CLI.exe",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@seald-io/nedb": "^4.0.3",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "express-xml-bodyparser": "^0.3.0",
+    "fast-xml-parser": "^4.2.7",
+    "ini": "^4.1.1",
+    "node-gyp": "^9.4.0",
+    "pkg": "^5.8.1",
+    "winax": "^3.3.7",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1",
+    "xml": "^1.0.1",
+    "xml-js": "^1.6.11"
+  }
+}

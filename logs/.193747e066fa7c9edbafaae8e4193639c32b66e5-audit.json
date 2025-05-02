@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\project\\QBD-Integration-SmallArc-17052024-SourceCode\\QBD-Integration-SmallArc\\QBDesktopServer-main\\logs\\.193747e066fa7c9edbafaae8e4193639c32b66e5-audit.json",
+    "files": [
+        {
+            "date": 1744880123781,
+            "name": "C:\\project\\QBD-Integration-SmallArc-17052024-SourceCode\\QBD-Integration-SmallArc\\QBDesktopServer-main\\logs\\error-2025-04-17.log",
+            "hash": "fe590eb5ec873256e9d49c9d0296498b9d6f360638d45493142b9d4d0d4db4fd"
+        },
+        {
+            "date": 1746174880950,
+            "name": "C:\\project\\QBD-Integration-SmallArc-17052024-SourceCode\\QBD-Integration-SmallArc\\QBDesktopServer-main\\logs\\error-2025-05-02.log",
+            "hash": "4756387e0885e91c2cefc519dd072261d3df623bc0f76ac93469af3c5f19ccdc"
+        }
+    ],
+    "hashType": "sha256"
+}
