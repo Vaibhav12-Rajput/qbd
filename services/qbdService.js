@@ -984,6 +984,9 @@ const createBill = async (bill, ticket, companyName) => {
   const expenseLines = await prepareExpenseLines(bill.lines, ticket, companyName);
   logger.info("Successfully found the expence line");
 
+  if(bill.poId == null ){
+    bill.poId = bill.qbBillNumber;
+  } 
   const preparedBill = prepareBill(expenseLines, bill);
   const billInXML = jsonToXml(preparedBill);
   const result = await sendRequestToQBD(billInXML, ticket);
