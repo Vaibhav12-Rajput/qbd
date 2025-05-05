@@ -369,9 +369,6 @@ const applyDiscount = (invoice) => {
     },
     RatePercent: parseFloat(invoice.discountPercentage).toFixed(2),
     // Amount: parseFloat(invoice.discountTotal) || 0,
-    SalesTaxCodeRef: {
-      FullName: qbdConstants.TAX_CODES.ZERO_SALES_TAX_CODE,
-    }
   }
 }
 
@@ -919,7 +916,7 @@ const createInvoice = async (invoice, ticket, companyName) => {
   logger.info("Successfully found the line items");
 
   const preparedInvoice = prepareInvoice(lineItems, invoice);
-  const invoiceInXML = jsonToXml(preparedInvoice);
+  const invoiceInXML = jsonToXml(preparedInvoice);  
 
   const result = await sendRequestToQBD(invoiceInXML, ticket);
   const resultInJson = convertXmlToJson(result);
