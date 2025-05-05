@@ -1,7 +1,7 @@
 const readConfigFile = require("../util/configUtil");
 const { logger } = require("../config/winstonConfig");
 const { QBApp, appName } = require("../config/qbdConfig");
-const { checkTemplate, validateSalesTax, validateOrCreateCustomer, getItemAndProcessInvoice, checkOrCreateNonTax, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill, insertOrUpdateBillInDBForFailure } = require("../services/qbdService");
+const { checkTemplate, validateSalesTax, validateOrCreateCustomer, getItemAndProcessInvoice, checkOrCreateNonTax, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill, insertOrUpdateBillInDBForFailure, checkOrCreateDiscount } = require("../services/qbdService");
 const CommonResponsePayload = require("../responsePayload/commonResponsePayload");
 
 exports.connect = async (req, res) => {
@@ -33,6 +33,7 @@ exports.connect = async (req, res) => {
     await checkOrCreateServiceItems(ticket);
     // await checkOrCreateItems(ticket);
     await checkOrCreateSubtotalItem(ticket);
+    await checkOrCreateDiscount(ticket);
 
     QBApp.EndSession(ticket);
     // QBApp.CloseConnection();

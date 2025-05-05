@@ -11,7 +11,7 @@ router.get('/', (req, res) => {
 
 router.post('/connect',auth.verifyRequest, qbdController.connect);
 router.post('/invoice',auth.verifyRequest,qbdController.createInvoice);
-router.post('/bill', qbdController.createBillController);
+router.post('/bill',auth.verifyRequest, qbdController.createBillController);
 
 
 module.exports = router;

@@ -354,8 +354,25 @@ const prepareLineItems = (invoice) => {
       lineItems.push(prepareSubtotal(qbdConstants.subTotalConstants.LABOR_TAX_SUB_TOTAL));
     }
   }
+  if (typeof invoice.discountPercentage === 'number' && isFinite(invoice.discountPercentage) && invoice.discountPercentage > 0) {
+    lineItems.push(applyDiscount(invoice));
+    lineItems.push(prepareSubtotal(qbdConstants.subTotalConstants.DISCOUNT_SUB_TOTAL));
+  }
   // lineItems.push(prepareSubtotal(qbdConstants.subTotalConstants.DISPOSAL_SUB_TOTAL));
   return lineItems;
+}
+
+const applyDiscount = (invoice) => {
+  return {
+    ItemRef: {
+      FullName: qbdConstants.discountConstants.DISCOUNT,
+    },
+    RatePercent: parseFloat(invoice.discountPercentage).toFixed(2),
+    // Amount: parseFloat(invoice.discountTotal) || 0,
+    SalesTaxCodeRef: {
+      FullName: qbdConstants.TAX_CODES.ZERO_SALES_TAX_CODE,
+    }
+  }
 }
 
 const prepareInvoice = (lineItems, invoice) => {
@@ -769,9 +786,7 @@ const checkOrCreateIncomeAccounts = async (ticket) => {
 
   await Promise.all(accountsList.map(async account => {
     let accountQuery = xmlPayloads.findAccountsByNameQuery.replace("ACCOUNT_NAME", prepareStringForXML(account));
-    logger.info(`[QBD] Sending AccountQuery for "${account}": ${accountQuery}`);
     let response = await sendRequestToQBD(accountQuery, ticket);
-    logger.info(`[QBD] Response for AccountQuery of "${account}": ${response}`);
     let responseInJson = convertXmlToJson(response);
     if (responseInJson.QBXML.QBXMLMsgsRs.AccountQueryRs.$.statusCode != STATUS_CODES.ZERO) {
       await createIncomeAccount(account, ticket)
@@ -938,7 +953,7 @@ const processBill = async (bill, ticket, companyName) => {
     }
   }
 
-  if(billTxnIdToDelete){
+  if (billTxnIdToDelete) {
     await checkIfBillAlreayPaid(billTxnIdToDelete, ticket);
   }
   // let { invoiceRefNumber, invoiceTxnId } = await createInvoice(invoice, ticket, companyName);
@@ -960,9 +975,9 @@ const processBill = async (bill, ticket, companyName) => {
   return response;
 }
 
-const checkIfBillAlreayPaid = async (txnId, ticket) =>{
+const checkIfBillAlreayPaid = async (txnId, ticket) => {
   const billResponse = await getBillByTxnId(txnId, ticket);
-  if (String(billResponse.IsPaid).toLowerCase() === "true") {    
+  if (String(billResponse.IsPaid).toLowerCase() === "true") {
     logger.error("Bill already paid");
     throw new Error("Bill already paid cannot update It");
   }
@@ -1265,4 +1280,48 @@ const insertOrUpdateBillInDBForFailure = async (poId, errorMessage, billDate, qb
   return oldbillRecord;
 }
 
-module.exports = { insertOrUpdateBillInDBForFailure, sendRequestToQBD, checkTemplate, prepareTaxListForValidation, validateOrCreateCustomer, getItemAndProcessInvoice, validateSalesTax, checkOrCreateNonTax, checkOrCreateItems, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill };
+
+const checkOrCreateDiscount = async (ticket) => {
+  let discountQuery = xmlPayloads.discountQuery.replace("DISCOUNT_ITEM_NAME", prepareStringForXML(qbdConstants.discountConstants.DISCOUNT));
+  let responseXML = await sendRequestToQBD(discountQuery, ticket);
+  let responseInJson = convertXmlToJson(responseXML);
+
+  if (responseInJson.QBXML.QBXMLMsgsRs.ItemDiscountQueryRs.$.statusCode != STATUS_CODES.ZERO) {
+    logger.info("Creating Discount item.")
+    let createDiscountItem = prepareDiscountItem('', qbdConstants.accounts.PARTS_AND_MATERIALS_ACCOUNT, qbdConstants.discountConstants.DISCOUNT);
+    let createDiscountItemPayloadXML = jsonToXml(createDiscountItem);
+    let responseXML = await sendRequestToQBD(createDiscountItemPayloadXML, ticket);
+    let responseInJson = convertXmlToJson(responseXML);
+    if (responseInJson.QBXML.QBXMLMsgsRs.ItemDiscountAddRs.$.statusCode != STATUS_CODES.ZERO) {
+      logger.error("Company got connected but exception while creating discount item. Error : " + responseInJson.QBXML.QBXMLMsgsRs.ItemDiscountAddRs.$.statusMessage);
+      throw new Error("Company got connected but exception while creating discount item. Error : " + responseInJson.QBXML.QBXMLMsgsRs.ItemDiscountAddRs.$.statusMessage)
+    }
+    logger.info("Discount item creted successfully.")
+  }
+}
+
+const prepareDiscountItem = (desc, accountName, itemName) => {
+  return {
+    QBXML: {
+      QBXMLMsgsRq: {
+        $: {
+          onError: "stopOnError"
+        },
+        ItemDiscountAddRq: {
+          $: {
+            requestID: "2"
+          },
+          ItemDiscountAdd: {
+            Name: itemName,
+            AccountRef: {
+              FullName: accountName
+            },
+          }
+        }
+      }
+    }
+  }
+};
+
+
+module.exports = { insertOrUpdateBillInDBForFailure, sendRequestToQBD, checkTemplate, prepareTaxListForValidation, validateOrCreateCustomer, getItemAndProcessInvoice, validateSalesTax, checkOrCreateNonTax, checkOrCreateItems, checkOrCreateSubtotalItem, checkOrCreateZeroSalesTaxCodes, checkOrCreateServiceItems, checkOrCreateIncomeAccounts, removeOldDBRecords, insertOrUpdateInDBForFailure, getAllSalesTaxFromQB, processBill, checkOrCreateDiscount };
