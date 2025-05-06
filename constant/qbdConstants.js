@@ -38,5 +38,5 @@ exports.accounts = {
     EXPENSE: "Expenses"
 }
 exports.discountConstants = {
-    DISCOUNT: "Discount-7"
+    DISCOUNT: "Discount"
 }

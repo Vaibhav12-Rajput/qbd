@@ -367,7 +367,7 @@ const applyDiscount = (invoice) => {
     ItemRef: {
       FullName: qbdConstants.discountConstants.DISCOUNT
     },
-    Desc: invoice.discountDescription || "Discount Applied", 
+    Desc: invoice.discountDescription || `${invoice.discountPercentage}% Discount`, 
     RatePercent: parseFloat(invoice.discountPercentage).toFixed(2),
   }
 }
