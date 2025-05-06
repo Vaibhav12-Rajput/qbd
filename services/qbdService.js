@@ -365,10 +365,10 @@ const prepareLineItems = (invoice) => {
 const applyDiscount = (invoice) => {
   return {
     ItemRef: {
-      FullName: qbdConstants.discountConstants.DISCOUNT,
+      FullName: qbdConstants.discountConstants.DISCOUNT
     },
+    Desc: invoice.discountDescription || "Discount Applied", 
     RatePercent: parseFloat(invoice.discountPercentage).toFixed(2),
-    // Amount: parseFloat(invoice.discountTotal) || 0,
   }
 }
 
